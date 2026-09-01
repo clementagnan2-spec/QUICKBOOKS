@@ -75,16 +75,20 @@ class ReconciliationPage(QWidget):
         lines = logic.unreconciled_lines(self.db, account_id, up_to_date=up_to)
         self.table.setRowCount(len(lines))
         self._line_ids = [l["id"] for l in lines]
+        self._line_amounts = []
         for row, l in enumerate(lines):
             cb = QCheckBox()
             cb.stateChanged.connect(self._update_summary)
             self.table.setCellWidget(row, 0, cb)
-            amount = l["debit"] - l["credit"]
-            self.table.setItem(row, 1, QTableWidgetItem(l["date"]))
-            self.table.setItem(row, 2, QTableWidgetItem(l["doc_type"]))
+            amount = round((l["debit"] or 0) - (l["credit"] or 0), 2)
+            self._line_amounts.append(amount)
+            self.table.setItem(row, 1, QTableWidgetItem(l["date"] or ""))
+            self.table.setItem(row, 2, QTableWidgetItem(l["doc_type"] or ""))
             self.table.setItem(row, 3, QTableWidgetItem(l["doc_number"] or ""))
             self.table.setItem(row, 4, QTableWidgetItem(l["description"] or ""))
-            self.table.setItem(row, 5, QTableWidgetItem(fmt_money(amount)))
+            amount_item = QTableWidgetItem(fmt_money(amount))
+            amount_item.setData(Qt.UserRole, amount)
+            self.table.setItem(row, 5, amount_item)
         self._update_summary()
 
     def _selected_ids_and_total(self):
@@ -93,12 +97,10 @@ class ReconciliationPage(QWidget):
             cb = self.table.cellWidget(row, 0)
             if cb and cb.isChecked():
                 selected_ids.append(self._line_ids[row])
-                text = self.table.item(row, 5).text().replace("GHS", "").replace(",", "").strip()
-                try:
-                    total += float(text)
-                except ValueError:
-                    pass
-        return selected_ids, total
+                item = self.table.item(row, 5)
+                amount = item.data(Qt.UserRole) if item is not None else None
+                total += amount if amount is not None else 0
+        return selected_ids, round(total, 2)
 
     def _update_summary(self):
         _ids, total = self._selected_ids_and_total()

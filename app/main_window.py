@@ -40,6 +40,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("GH-Compta — Comptabilité")
         self.resize(1280, 800)
+        self.setMinimumSize(1000, 600)
 
         self.db = Database()
 
@@ -65,16 +66,22 @@ class MainWindow(QMainWindow):
         self.nav_list = QListWidget()
         self.nav_list.setStyleSheet(
             """
-            QListWidget { background-color:#1F3D2E; border:none; color:white; font-size:14px; }
-            QListWidget::item { padding:12px 20px; }
+            QListWidget { background-color:#1F3D2E; border:none; color:white; font-size:13px;
+                          outline:none; }
+            QListWidget::item { padding:10px 20px; }
             QListWidget::item:selected { background-color:#2CA01C; color:white; }
             QListWidget::item:hover { background-color:#2b5240; }
+            QScrollBar:vertical { background:#1F3D2E; width:12px; margin:0; }
+            QScrollBar::handle:vertical { background:#4a7a63; min-height:24px; border-radius:5px; }
+            QScrollBar::handle:vertical:hover { background:#5c9a7d; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:none; }
             """
         )
+        self.nav_list.setVerticalScrollMode(QListWidget.ScrollPerPixel)
         for label, _key in NAV_ITEMS:
             QListWidgetItem(label, self.nav_list)
         sb_layout.addWidget(self.nav_list)
-        sb_layout.addStretch()
 
         layout.addWidget(sidebar)
 
