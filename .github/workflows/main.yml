@@ -1,0 +1,39 @@
+name: Build Windows .exe
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compiler avec PyInstaller
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name GH-Compta main.py
+
+      - name: Publier l'exécutable (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: GH-Compta-windows-exe
+          path: dist/GH-Compta.exe
+
+      - name: Créer une release (si tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/GH-Compta.exe
