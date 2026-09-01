@@ -3,17 +3,29 @@
 Logiciel de comptabilité en partie double, style QuickBooks, développé en **Python + PyQt5**
 avec une base de données **SQLite locale**. Compilable en `.exe` Windows via GitHub Actions.
 
-## Fonctionnalités (v1)
+## Fonctionnalités (v2)
 
 - **Plan comptable** pré-rempli à partir de votre structure existante (Trésorerie, Comptes
   clients, Immobilisations, Comptes fournisseurs, Capitaux propres, Coût des ventes, Dépenses...)
 - **Clients** et **Fournisseurs**
-- **Ventes / Factures** avec lignes multiples → écriture automatique (Débit Comptes clients /
-  Crédit Produits)
+- **Ventes / Factures** avec lignes multiples, liées ou non à un article de stock → écriture
+  automatique (Débit Comptes clients / Crédit Produits, + sortie de stock et COGS si applicable)
 - **Dépenses / Achats comptant** → écriture automatique (Débit Charges / Crédit Trésorerie)
+- **Factures fournisseurs à crédit** (paiement différé) → écriture (Débit Charges ou Stock /
+  Crédit Comptes fournisseurs), avec enregistrement de paiements partiels ou totaux ensuite
+- **Gestion de stock** : articles avec quantité en main, coût moyen pondéré (CMP) recalculé
+  automatiquement à chaque achat, sortie de stock + coût des marchandises vendues (COGS)
+  générés automatiquement à la vente
+- **Rapprochement bancaire** : pointage des opérations d'un compte de trésorerie face à un
+  relevé, calcul de l'écart, historique des sessions de rapprochement
+- **Devises multiples** : taux de change par devise et par date, conversion automatique en
+  devise de base (GHS) dans les totaux des rapports consolidés
+- **Export PDF** des factures clients et des rapports (Bilan, Compte de résultat, Flux de
+  trésorerie)
 - **Paiements clients** (encaissement partiel ou total d'une facture)
 - **Journal général** consultable + écritures manuelles (opérations diverses)
-- **Rapports** : Bilan, Compte de résultat, État des flux de trésorerie (simplifié)
+- **Rapports** : Bilan, Compte de résultat, État des flux de trésorerie (simplifié), tous
+  exportables en PDF
 - Toute écriture est vérifiée : le total débit doit toujours égaler le total crédit avant
   d'être enregistrée (partie double garantie).
 
@@ -69,10 +81,8 @@ lancement, avec le plan comptable pré-rempli).
 
 ## Prochaines étapes possibles
 
-- Factures fournisseurs à crédit (Bill) avec paiement différé
-- Rapprochement bancaire
-- Gestion de stock / articles
-- Export PDF des factures et rapports
-- Gestion multi-devises avec taux de change
-- Classes et sites déjà présents en base (ex. "programme", "ouaga") à exploiter dans les
-  formulaires et rapports filtrés
+- Filtrage des rapports par classe / site (déjà en base, ex. "programme", "ouaga")
+- Export PDF des factures fournisseurs (actuellement disponible pour les factures clients)
+- Import de relevés bancaires (CSV) pour le rapprochement automatique
+- Gestion des acomptes / avoirs
+- Utilisateurs multiples avec droits d'accès

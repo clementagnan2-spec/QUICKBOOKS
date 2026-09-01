@@ -8,6 +8,7 @@ from PyQt5.QtGui import QFont
 
 from .. import logic
 from ..ui_utils import fmt_money
+from ..pdf_export import export_report_pdf
 
 
 def _simple_table():
@@ -65,8 +66,15 @@ class ReportsPage(QWidget):
         run_btn.setStyleSheet("background:#2CA01C; color:white; padding:6px 14px; border-radius:4px;")
         run_btn.clicked.connect(self._render)
         top.addWidget(run_btn)
+
+        pdf_btn = QPushButton("Exporter en PDF")
+        pdf_btn.setStyleSheet("background:#1F3D2E; color:white; padding:6px 14px; border-radius:4px;")
+        pdf_btn.clicked.connect(self._export_pdf)
+        top.addWidget(pdf_btn)
         top.addStretch()
         layout.addLayout(top)
+
+        self._last_report = None
 
         self.table = _simple_table()
         layout.addWidget(self.table)
@@ -75,6 +83,21 @@ class ReportsPage(QWidget):
 
     def refresh(self):
         self._render()
+
+    def _export_pdf(self):
+        if not self._last_report:
+            return
+        from PyQt5.QtWidgets import QFileDialog, QMessageBox
+        name, data, start, end = self._last_report
+        default_name = f"{name.replace(' ', '_')}_{end}.pdf"
+        path, _ = QFileDialog.getSaveFileName(self, "Exporter en PDF", default_name, "PDF (*.pdf)")
+        if not path:
+            return
+        try:
+            export_report_pdf(path, name, data, start, end)
+            QMessageBox.information(self, "Export réussi", f"Rapport exporté :\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur d'export", str(e))
 
     def _render(self):
         report = self.report_combo.currentText()
@@ -93,43 +116,45 @@ class ReportsPage(QWidget):
     def _render_balance_sheet(self, as_of):
         bs = logic.balance_sheet(self.db, as_of)
         t = self.table
-        _add_row(t, f"BILAN au {as_of}", "", bold=True)
+        _add_row(t, f"BILAN au {as_of} (totaux consolidés en GHS)", "", bold=True)
         _add_row(t, "ACTIF", "")
         for label in ("Actif à court terme", "Actif à long terme"):
-            for acc, bal in bs["sections"][label]:
+            for acc, bal, _base in bs["sections"][label]:
                 _add_row(t, f"  {acc['name']}", fmt_money(bal, acc["currency"]))
-        _add_row(t, "Total Actif", fmt_money(bs["total_actif"]), bold=True)
+        _add_row(t, "Total Actif", fmt_money(bs["total_actif"], "GHS"), bold=True)
         _add_row(t, "", "")
         _add_row(t, "PASSIF & CAPITAUX PROPRES", "")
         for label in ("Passif à court terme", "Passif à long terme"):
-            for acc, bal in bs["sections"][label]:
+            for acc, bal, _base in bs["sections"][label]:
                 _add_row(t, f"  {acc['name']}", fmt_money(bal, acc["currency"]))
-        for acc, bal in bs["sections"]["Capitaux propres"]:
+        for acc, bal, _base in bs["sections"]["Capitaux propres"]:
             _add_row(t, f"  {acc['name']}", fmt_money(bal, acc["currency"]))
-        _add_row(t, "  Résultat net (cumulé)", fmt_money(bs["net_income"]))
+        _add_row(t, "  Résultat net (cumulé)", fmt_money(bs["net_income"], "GHS"))
         _add_row(t, "Total Passif + Capitaux propres",
-                 fmt_money(bs["total_passif"] + bs["total_capitaux_propres"]), bold=True)
+                 fmt_money(bs["total_passif"] + bs["total_capitaux_propres"], "GHS"), bold=True)
+        self._last_report = ("Bilan", bs, as_of, as_of)
 
     def _render_income_statement(self, start, end):
         inc = logic.income_statement(self.db, start, end)
         t = self.table
-        _add_row(t, f"COMPTE DE RÉSULTAT du {start} au {end}", "", bold=True)
+        _add_row(t, f"COMPTE DE RÉSULTAT du {start} au {end} (totaux consolidés en GHS)", "", bold=True)
         _add_row(t, "Produits", "")
-        for acc, bal in inc["produits"]:
-            _add_row(t, f"  {acc['name']}", fmt_money(bal))
-        _add_row(t, "Total Produits", fmt_money(inc["total_produits"]), bold=True)
+        for acc, bal, _base in inc["produits"]:
+            _add_row(t, f"  {acc['name']}", fmt_money(bal, acc["currency"]))
+        _add_row(t, "Total Produits", fmt_money(inc["total_produits"], "GHS"), bold=True)
         _add_row(t, "", "")
         _add_row(t, "Coût des ventes", "")
-        for acc, bal in inc["cout_ventes"]:
-            _add_row(t, f"  {acc['name']}", fmt_money(bal))
-        _add_row(t, "Total Coût des ventes", fmt_money(inc["total_cout_ventes"]), bold=True)
-        _add_row(t, "Marge brute", fmt_money(inc["marge_brute"]), bold=True)
+        for acc, bal, _base in inc["cout_ventes"]:
+            _add_row(t, f"  {acc['name']}", fmt_money(bal, acc["currency"]))
+        _add_row(t, "Total Coût des ventes", fmt_money(inc["total_cout_ventes"], "GHS"), bold=True)
+        _add_row(t, "Marge brute", fmt_money(inc["marge_brute"], "GHS"), bold=True)
         _add_row(t, "", "")
         _add_row(t, "Dépenses", "")
-        for acc, bal in inc["depenses"]:
-            _add_row(t, f"  {acc['name']}", fmt_money(bal))
-        _add_row(t, "Total Dépenses", fmt_money(inc["total_depenses"]), bold=True)
-        _add_row(t, "RÉSULTAT NET", fmt_money(inc["resultat_net"]), bold=True)
+        for acc, bal, _base in inc["depenses"]:
+            _add_row(t, f"  {acc['name']}", fmt_money(bal, acc["currency"]))
+        _add_row(t, "Total Dépenses", fmt_money(inc["total_depenses"], "GHS"), bold=True)
+        _add_row(t, "RÉSULTAT NET", fmt_money(inc["resultat_net"], "GHS"), bold=True)
+        self._last_report = ("Compte de résultat", inc, start, end)
 
     def _render_cash_flow(self, start, end):
         cf = logic.cash_flow(self.db, start, end)
@@ -140,3 +165,4 @@ class ReportsPage(QWidget):
             _add_row(t, f"  {r['account']['name']} — variation", fmt_money(r["change"]))
         _add_row(t, "Variation nette de trésorerie", fmt_money(cf["net_change"]), bold=True)
         _add_row(t, "Trésorerie en fin de période", fmt_money(cf["total_end"]), bold=True)
+        self._last_report = ("État des flux de trésorerie", cf, start, end)

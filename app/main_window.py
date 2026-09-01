@@ -12,6 +12,10 @@ from .pages.customers_page import CustomersPage
 from .pages.vendors_page import VendorsPage
 from .pages.invoices_page import InvoicesPage
 from .pages.expenses_page import ExpensesPage
+from .pages.bills_page import BillsPage
+from .pages.items_page import ItemsPage
+from .pages.reconciliation_page import ReconciliationPage
+from .pages.currency_page import CurrencyPage
 from .pages.journal_page import JournalPage
 from .pages.reports_page import ReportsPage
 
@@ -22,6 +26,10 @@ NAV_ITEMS = [
     ("Fournisseurs", "vendors"),
     ("Ventes / Factures", "invoices"),
     ("Dépenses / Achats", "expenses"),
+    ("Factures fournisseurs", "bills"),
+    ("Stock / Articles", "items"),
+    ("Rapprochement bancaire", "reconciliation"),
+    ("Devises", "currency"),
     ("Journal général", "journal"),
     ("Rapports", "reports"),
 ]
@@ -81,6 +89,10 @@ class MainWindow(QMainWindow):
         self._add_page("vendors", VendorsPage(self.db))
         self._add_page("invoices", InvoicesPage(self.db))
         self._add_page("expenses", ExpensesPage(self.db))
+        self._add_page("bills", BillsPage(self.db))
+        self._add_page("items", ItemsPage(self.db))
+        self._add_page("reconciliation", ReconciliationPage(self.db))
+        self._add_page("currency", CurrencyPage(self.db))
         self._add_page("journal", JournalPage(self.db))
         self._add_page("reports", ReportsPage(self.db))
 

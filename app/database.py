@@ -102,6 +102,8 @@ class Database:
                 description TEXT,
                 debit REAL NOT NULL DEFAULT 0,
                 credit REAL NOT NULL DEFAULT 0,
+                reconciled INTEGER DEFAULT 0,
+                reconciliation_id INTEGER,
                 FOREIGN KEY (entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE,
                 FOREIGN KEY (account_id) REFERENCES accounts(id)
             );
@@ -126,12 +128,14 @@ class Database:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 invoice_id INTEGER NOT NULL,
                 account_id INTEGER NOT NULL,
+                item_id INTEGER,
                 description TEXT,
                 qty REAL DEFAULT 1,
                 unit_price REAL DEFAULT 0,
                 amount REAL DEFAULT 0,
                 FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
-                FOREIGN KEY (account_id) REFERENCES accounts(id)
+                FOREIGN KEY (account_id) REFERENCES accounts(id),
+                FOREIGN KEY (item_id) REFERENCES items(id)
             );
 
             CREATE TABLE IF NOT EXISTS bills (
@@ -154,9 +158,66 @@ class Database:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 bill_id INTEGER NOT NULL,
                 account_id INTEGER NOT NULL,
+                item_id INTEGER,
                 description TEXT,
+                qty REAL DEFAULT 1,
+                unit_cost REAL DEFAULT 0,
                 amount REAL DEFAULT 0,
                 FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE,
+                FOREIGN KEY (account_id) REFERENCES accounts(id),
+                FOREIGN KEY (item_id) REFERENCES items(id)
+            );
+
+            -- Articles (produits/services) pour la gestion de stock
+            CREATE TABLE IF NOT EXISTS items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sku TEXT,
+                name TEXT NOT NULL,
+                item_type TEXT NOT NULL DEFAULT 'Stock',  -- Stock / Service / Non-stock
+                income_account_id INTEGER,     -- compte de produit utilisé à la vente
+                expense_account_id INTEGER,    -- compte de charge (COGS) utilisé à la vente
+                asset_account_id INTEGER,      -- compte d'actif "Stock" utilisé à l'achat
+                sales_price REAL DEFAULT 0,
+                cost REAL DEFAULT 0,           -- coût moyen unitaire actuel
+                qty_on_hand REAL DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                FOREIGN KEY (income_account_id) REFERENCES accounts(id),
+                FOREIGN KEY (expense_account_id) REFERENCES accounts(id),
+                FOREIGN KEY (asset_account_id) REFERENCES accounts(id)
+            );
+
+            -- Historique des mouvements de stock (pour audit et coût moyen pondéré)
+            CREATE TABLE IF NOT EXISTS stock_moves (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                move_type TEXT NOT NULL,  -- ACHAT / VENTE / AJUSTEMENT
+                qty_change REAL NOT NULL, -- positif = entrée, négatif = sortie
+                unit_cost REAL DEFAULT 0,
+                ref_doc TEXT,
+                FOREIGN KEY (item_id) REFERENCES items(id)
+            );
+
+            -- Taux de change vers la devise de base (GHS)
+            CREATE TABLE IF NOT EXISTS exchange_rates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                currency TEXT NOT NULL,
+                rate_to_base REAL NOT NULL,   -- 1 unité de 'currency' = X GHS
+                date TEXT NOT NULL,
+                UNIQUE(currency, date)
+            );
+
+            -- Sessions de rapprochement bancaire
+            CREATE TABLE IF NOT EXISTS reconciliations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                statement_date TEXT NOT NULL,
+                statement_ending_balance REAL NOT NULL,
+                beginning_balance REAL NOT NULL,
+                cleared_balance REAL NOT NULL,
+                difference REAL NOT NULL,
+                status TEXT DEFAULT 'Terminé',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (account_id) REFERENCES accounts(id)
             );
 
@@ -203,6 +264,7 @@ class Database:
             ("", "ACTIVITE3", "TRESORERIE", "Trésorerie", "GHS"),
             ("45000", "BAILLEURS", "COMPTES_CLIENTS", "Comptes clients", "GHS"),
             ("", "Clients - USD", "COMPTES_CLIENTS", "Comptes clients", "USD"),
+            ("", "Stock de marchandises", "STOCK", "Stock", "GHS"),
             # --- Actifs à long terme ---
             ("15000", "IMMOBILISATIONS", "ACTIF_LONG_TERME", "Immobilisations", "GHS"),
             # --- Passifs ---
@@ -244,6 +306,15 @@ class Database:
     def _seed_misc(self):
         self.conn.execute("INSERT OR IGNORE INTO classes (name) VALUES ('programme')")
         self.conn.execute("INSERT OR IGNORE INTO sites (name) VALUES ('ouaga')")
+        # Taux de change de départ (modifiable dans le module Devises) — GHS = devise de base
+        self.conn.execute(
+            "INSERT OR IGNORE INTO exchange_rates (currency, rate_to_base, date) VALUES ('GHS', 1.0, ?)",
+            (date.today().isoformat(),),
+        )
+        self.conn.execute(
+            "INSERT OR IGNORE INTO exchange_rates (currency, rate_to_base, date) VALUES ('USD', 15.0, ?)",
+            (date.today().isoformat(),),
+        )
         self.conn.commit()
 
     # ------------------------------------------------------------------ #
