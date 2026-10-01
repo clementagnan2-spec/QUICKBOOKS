@@ -262,3 +262,48 @@ def import_chart_xlsx(db, path):
             created += 1
     db.conn.commit()
     return created, updated
+
+
+# ---------------------------------------------------------------------- #
+# Remise à zéro : efface les écritures et remplace le plan par le standard
+# ---------------------------------------------------------------------- #
+def backup_database(db):
+    """Copie la base actuelle à côté d'elle. Retourne le chemin de la sauvegarde."""
+    import os
+    import shutil
+    from datetime import datetime
+    db.conn.commit()
+    folder = os.path.dirname(db.path)
+    dest = os.path.join(folder, f"gh_compta_sauvegarde_{datetime.now():%Y%m%d_%H%M%S}.db")
+    shutil.copy2(db.path, dest)
+    return dest
+
+
+def reset_to_standard_chart(db):
+    """
+    IRRÉVERSIBLE (hors sauvegarde) : supprime toutes les écritures et les documents qui en
+    dépendent (factures, factures fournisseurs, dépenses, rapprochements, mouvements de stock),
+    supprime tous les comptes, puis recharge le plan standard US GAAP <-> SYCEBNL.
+    Sont conservés : clients, fournisseurs, devises, classes, sites et articles (leurs comptes
+    sont vidés et leur stock remis à zéro, à reparamétrer).
+    Retourne le chemin de la sauvegarde.
+    """
+    backup = backup_database(db)
+    c = db.conn
+    try:
+        for table in ("invoice_lines", "invoices", "bill_lines", "bills",
+                      "expense_lines", "expenses", "reconciliations", "stock_moves",
+                      "journal_lines", "journal_entries"):
+            c.execute(f"DELETE FROM {table}")
+        c.execute("UPDATE items SET income_account_id=NULL, expense_account_id=NULL, "
+                  "asset_account_id=NULL, qty_on_hand=0, cost=0")
+        c.execute("DELETE FROM accounts")
+        c.execute("DELETE FROM sqlite_sequence WHERE name IN ('accounts','journal_entries','journal_lines',"
+                  "'invoices','invoice_lines','bills','bill_lines','expenses','expense_lines',"
+                  "'reconciliations','stock_moves')")
+        c.commit()
+    except Exception:
+        c.rollback()
+        raise
+    load_standard_chart(db)
+    return backup

@@ -2,7 +2,7 @@ from datetime import date
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QDialog, QFormLayout,
     QLineEdit, QComboBox, QDialogButtonBox, QMessageBox, QDoubleSpinBox, QFileDialog,
-    QPlainTextEdit
+    QPlainTextEdit, QInputDialog
 )
 from PyQt5.QtGui import QFont, QColor
 
@@ -142,6 +142,7 @@ class AccountsPage(QWidget):
             ("Importer Excel", self.import_xlsx, "#0B5FFF"),
             ("Exporter Excel", self.export_xlsx, "#0B5FFF"),
             ("Compléter avec le plan standard", self.load_standard, "#6c757d"),
+            ("Tout réinitialiser…", self.reset_all, "#7a1f1f"),
         ):
             b = QPushButton(text)
             b.setStyleSheet(f"background:{color}; color:white; padding:8px 12px; border-radius:4px;")
@@ -262,6 +263,27 @@ class AccountsPage(QWidget):
         n = cp.load_standard_chart(self.db)
         QMessageBox.information(self, "Plan standard",
                                 f"{n} compte(s) ajouté(s). Les comptes existants n'ont pas été modifiés.")
+        self.refresh()
+
+    def reset_all(self):
+        msg = ("Cette action va EFFACER toutes les écritures du journal, les factures, "
+               "factures fournisseurs, dépenses, rapprochements et mouvements de stock, "
+               "puis REMPLACER tout le plan comptable par le plan standard US GAAP ↔ SYCEBNL.\n\n"
+               "Conservés : clients, fournisseurs, devises, articles (à reparamétrer).\n"
+               "Une copie de sauvegarde de la base sera créée avant l'effacement.\n\nContinuer ?")
+        if QMessageBox.warning(self, "Tout réinitialiser", msg,
+                               QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel) != QMessageBox.Yes:
+            return
+        text, ok = QInputDialog.getText(self, "Confirmation", "Tapez EFFACER pour confirmer :")
+        if not ok or text.strip().upper() != "EFFACER":
+            return
+        try:
+            backup = cp.reset_to_standard_chart(self.db)
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Réinitialisation annulée :\n{e}")
+            return
+        QMessageBox.information(self, "Terminé",
+                                f"Plan standard chargé, écritures effacées.\nSauvegarde : {backup}")
         self.refresh()
 
     # ------------------------------------------------------------------ #
