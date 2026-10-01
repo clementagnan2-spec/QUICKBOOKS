@@ -25,6 +25,7 @@ class Database:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.row_factory = sqlite3.Row
         self._create_schema()
+        self._migrate_accounts()
         if first_time:
             self._seed_accounts()
             self._seed_misc()
@@ -44,7 +45,14 @@ class Database:
                 detail_type TEXT,
                 description TEXT,
                 currency TEXT DEFAULT 'GHS',
-                is_active INTEGER DEFAULT 1
+                is_active INTEGER DEFAULT 1,
+                gaap_section TEXT,            -- CA/NCA/CL/LTL/EQ/REV/COGS/OPEX/OINC/OEXP/TAX
+                syc_code TEXT,                -- compte SYCEBNL correspondant
+                syc_name TEXT,
+                mapping_type TEXT,
+                coefficient REAL DEFAULT 1,
+                review_status TEXT,
+                remark TEXT
             );
 
             CREATE TABLE IF NOT EXISTS classes (
@@ -250,58 +258,25 @@ class Database:
         )
         c.commit()
 
+    def _migrate_accounts(self):
+        """Ajoute les colonnes de correspondance US GAAP / SYCEBNL aux bases créées avant cette version."""
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(accounts)").fetchall()}
+        wanted = [
+            ("gaap_section", "TEXT"), ("syc_code", "TEXT"), ("syc_name", "TEXT"),
+            ("mapping_type", "TEXT"), ("coefficient", "REAL DEFAULT 1"),
+            ("review_status", "TEXT"), ("remark", "TEXT"),
+        ]
+        for name, decl in wanted:
+            if name not in cols:
+                self.conn.execute(f"ALTER TABLE accounts ADD COLUMN {name} {decl}")
+        self.conn.commit()
+
     # ------------------------------------------------------------------ #
-    # Données de départ : plan comptable basé sur les captures fournies
+    # Données de départ : plan comptable US GAAP <-> SYCEBNL
     # ------------------------------------------------------------------ #
     def _seed_accounts(self):
-        # (numero, nom, type_compte, type_detail, devise)
-        accounts = [
-            # --- Trésorerie / Actifs à court terme ---
-            ("1000", "Cash and cash equivalents", "TRESORERIE", "Trésorerie", "GHS"),
-            ("1003", "PETTY CASH TRACKER", "TRESORERIE", "Fonds de caisse", "GHS"),
-            ("101400", "BANQUE", "TRESORERIE", "Banque", "GHS"),
-            ("", "ACTIVITE2", "TRESORERIE", "Trésorerie", "GHS"),
-            ("", "ACTIVITE3", "TRESORERIE", "Trésorerie", "GHS"),
-            ("45000", "BAILLEURS", "COMPTES_CLIENTS", "Comptes clients", "GHS"),
-            ("", "Clients - USD", "COMPTES_CLIENTS", "Comptes clients", "USD"),
-            ("", "Stock de marchandises", "STOCK", "Stock", "GHS"),
-            # --- Actifs à long terme ---
-            ("15000", "IMMOBILISATIONS", "ACTIF_LONG_TERME", "Immobilisations", "GHS"),
-            # --- Passifs ---
-            ("23000", "SALAIRE NET", "PASSIF_COURT_TERME", "Gestion et rémunérations", "GHS"),
-            ("", "Accounts Payable (A/P)", "COMPTES_FOURNISSEURS", "Comptes fournisseurs", "GHS"),
-            ("", "Accounts Payable (A/P) - USD", "COMPTES_FOURNISSEURS", "Comptes fournisseurs", "USD"),
-            ("", "Taxe sur la valeur ajoutée", "PASSIF_COURT_TERME", "Taxes à payer", "GHS"),
-            # --- Capitaux propres ---
-            ("", "Retained Earnings", "CAPITAUX_PROPRES", "Bénéfices non répartis", "GHS"),
-            # --- Produits (à compléter selon votre activité) ---
-            ("40000", "Ventes de services", "PRODUITS", "Produits d'exploitation", "GHS"),
-            ("40100", "Autres produits", "PRODUITS", "Produits d'exploitation", "GHS"),
-            # --- Coût des ventes ---
-            ("", "Cost of sales", "COUT_DES_VENTES", "Fournitures et matériaux - CDS", "GHS"),
-            ("", "Coût des ventes", "COUT_DES_VENTES", "Fournitures et matériaux - CDS", "GHS"),
-            ("", "Freight and delivery - COS", "COUT_DES_VENTES", "Expédition, fret et livraison - CDS", "GHS"),
-            # --- Dépenses ---
-            ("50000", "GROSS SALARY", "DEPENSES", "Gestion et rémunérations", "GHS"),
-            ("50200", "VOYAGE", "DEPENSES", "Frais de déplacement - frais généraux et administratifs", "GHS"),
-            ("", "Amortisation expense", "DEPENSES", "Dépenses d'amortissement", "GHS"),
-            ("", "Bad debts", "DEPENSES", "Créances irrécouvrables", "GHS"),
-            ("", "Bank charges", "DEPENSES", "Frais bancaires", "GHS"),
-            ("", "Commissions and fees", "DEPENSES", "Commissions et frais", "GHS"),
-            ("", "Dues and subscriptions", "DEPENSES", "Droits d'adhésion et abonnements", "GHS"),
-            ("", "Equipment rental", "DEPENSES", "Location de matériel", "GHS"),
-            ("", "Income tax expense", "DEPENSES", "Dépenses d'impôt sur le revenu", "GHS"),
-            ("", "Insurance - Disability", "DEPENSES", "Assurance", "GHS"),
-            ("", "Insurance - General", "DEPENSES", "Assurance", "GHS"),
-            ("", "Insurance - Liability", "DEPENSES", "Assurance", "GHS"),
-            ("", "Interest expense", "DEPENSES", "Intérêts payés", "GHS"),
-            ("", "Legal and professional fees", "DEPENSES", "Frais juridiques et professionnels", "GHS"),
-        ]
-        self.conn.executemany(
-            "INSERT INTO accounts (number, name, account_type, detail_type, currency) VALUES (?,?,?,?,?)",
-            accounts,
-        )
-        self.conn.commit()
+        from .chart_plan import load_standard_chart
+        load_standard_chart(self)
 
     def _seed_misc(self):
         self.conn.execute("INSERT OR IGNORE INTO classes (name) VALUES ('programme')")

@@ -33,63 +33,49 @@ def _styled_table(rows, bold_rows=()):
     return table
 
 
-def export_report_pdf(path, report_name, data, start, end):
+def _report_elements(report, styles):
+    """Éléments ReportLab pour un rapport structuré (voir app/reports.py)."""
+    els = [Paragraph(report["title"], styles["Heading2"]),
+           Paragraph(report["subtitle"], styles["Normal"]), Spacer(1, 6)]
+    rows, style = [], []
+    for r in report["rows"]:
+        i = len(rows)
+        kind = r["kind"]
+        label = ("    " if kind == "line" else "") + (r["label"] or "")
+        if r["code"] and kind == "line":
+            label = f"    {r['code']}  {r['label']}"
+        amount = "" if r["amount"] is None else fmt_money(r["amount"], "GHS")
+        rows.append([label, amount])
+        if kind in ("section", "subtotal", "total"):
+            style.append(("FONTNAME", (0, i), (-1, i), "Helvetica-Bold"))
+        if kind in ("subtotal", "total"):
+            style.append(("LINEABOVE", (0, i), (-1, i), 0.5, colors.grey))
+        if kind == "total":
+            style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#E6F4EA")))
+        if kind == "warn":
+            style.append(("TEXTCOLOR", (0, i), (-1, i), colors.red))
+    table = Table(rows, colWidths=[11.5 * cm, 4.5 * cm])
+    table.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9), ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ] + style))
+    els.append(table)
+    return els
+
+
+def export_report_pdf(path, reports):
+    """
+    reports : liste de rapports structurés (ex. [version US GAAP, version SYCEBNL]).
+    Chaque version est placée sur sa propre page du même PDF.
+    """
+    from reportlab.platypus import PageBreak
     doc, styles, title_style = _base_doc(path)
-    elements = [Paragraph("GH-Compta", title_style), Spacer(1, 4)]
-
-    if report_name == "Bilan":
-        elements.append(Paragraph(f"Bilan au {end}", styles["Heading2"]))
-        rows, bold = [], []
-        rows.append(["ACTIF", ""]); bold.append(len(rows) - 1)
-        for label in ("Actif à court terme", "Actif à long terme"):
-            for acc, bal, _base in data["sections"][label]:
-                rows.append([f"  {acc['name']}", fmt_money(bal, acc["currency"])])
-        rows.append(["Total Actif", fmt_money(data["total_actif"], "GHS")]); bold.append(len(rows) - 1)
-        rows.append(["", ""])
-        rows.append(["PASSIF & CAPITAUX PROPRES", ""]); bold.append(len(rows) - 1)
-        for label in ("Passif à court terme", "Passif à long terme"):
-            for acc, bal, _base in data["sections"][label]:
-                rows.append([f"  {acc['name']}", fmt_money(bal, acc["currency"])])
-        for acc, bal, _base in data["sections"]["Capitaux propres"]:
-            rows.append([f"  {acc['name']}", fmt_money(bal, acc["currency"])])
-        rows.append(["  Résultat net (cumulé)", fmt_money(data["net_income"], "GHS")])
-        rows.append(["Total Passif + Capitaux propres",
-                      fmt_money(data["total_passif"] + data["total_capitaux_propres"], "GHS")])
-        bold.append(len(rows) - 1)
-        elements.append(_styled_table(rows, bold))
-
-    elif report_name == "Compte de résultat":
-        elements.append(Paragraph(f"Compte de résultat du {start} au {end}", styles["Heading2"]))
-        rows, bold = [], []
-        rows.append(["Produits", ""]); bold.append(len(rows) - 1)
-        for acc, bal, _base in data["produits"]:
-            rows.append([f"  {acc['name']}", fmt_money(bal, acc["currency"])])
-        rows.append(["Total Produits", fmt_money(data["total_produits"], "GHS")]); bold.append(len(rows) - 1)
-        rows.append(["Coût des ventes", ""]); bold.append(len(rows) - 1)
-        for acc, bal, _base in data["cout_ventes"]:
-            rows.append([f"  {acc['name']}", fmt_money(bal, acc["currency"])])
-        rows.append(["Total Coût des ventes", fmt_money(data["total_cout_ventes"], "GHS")])
-        bold.append(len(rows) - 1)
-        rows.append(["Marge brute", fmt_money(data["marge_brute"], "GHS")]); bold.append(len(rows) - 1)
-        rows.append(["Dépenses", ""]); bold.append(len(rows) - 1)
-        for acc, bal, _base in data["depenses"]:
-            rows.append([f"  {acc['name']}", fmt_money(bal, acc["currency"])])
-        rows.append(["Total Dépenses", fmt_money(data["total_depenses"], "GHS")]); bold.append(len(rows) - 1)
-        rows.append(["RÉSULTAT NET", fmt_money(data["resultat_net"], "GHS")]); bold.append(len(rows) - 1)
-        elements.append(_styled_table(rows, bold))
-
-    else:  # État des flux de trésorerie
-        elements.append(Paragraph(f"État des flux de trésorerie du {start} au {end}", styles["Heading2"]))
-        rows, bold = [], []
-        rows.append(["Trésorerie en début de période", fmt_money(data["total_start"], "GHS")])
-        for r in data["rows"]:
-            rows.append([f"  {r['account']['name']} — variation", fmt_money(r["change"], "GHS")])
-        rows.append(["Variation nette de trésorerie", fmt_money(data["net_change"], "GHS")])
-        bold.append(len(rows) - 1)
-        rows.append(["Trésorerie en fin de période", fmt_money(data["total_end"], "GHS")])
-        bold.append(len(rows) - 1)
-        elements.append(_styled_table(rows, bold))
-
+    elements = []
+    for i, rep in enumerate(reports):
+        if i:
+            elements.append(PageBreak())
+        elements.append(Paragraph("GH-Compta", title_style))
+        elements.extend(_report_elements(rep, styles))
     doc.build(elements)
 
 

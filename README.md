@@ -5,8 +5,13 @@ avec une base de données **SQLite locale**. Compilable en `.exe` Windows via Gi
 
 ## Fonctionnalités (v2)
 
-- **Plan comptable** pré-rempli à partir de votre structure existante (Trésorerie, Comptes
-  clients, Immobilisations, Comptes fournisseurs, Capitaux propres, Coût des ventes, Dépenses...)
+- **Plan comptable double référentiel US GAAP ↔ SYCEBNL**, pré-rempli (79 comptes) à partir de
+  `Correspondance_US_GAAP_SYCEBNL.xlsx`. Entièrement **modifiable** : ajout, modification,
+  désactivation, suppression (si jamais utilisé), import / export Excel. Chaque compte porte son
+  code et intitulé US GAAP, sa section US GAAP, son compte SYCEBNL et un coefficient.
+- **Rapports en double version** (Bilan, Compte de résultat, Flux de trésorerie) : version
+  **US GAAP** et version **SYCEBNL**, côte à côte à l'écran et dans un même PDF (une page par version).
+  Les écritures sont saisies une seule fois ; seul le regroupement des comptes change.
 - **Clients** et **Fournisseurs**
 - **Ventes / Factures** avec lignes multiples, liées ou non à un article de stock → écriture
   automatique (Débit Comptes clients / Crédit Produits, + sortie de stock et COGS si applicable)
@@ -36,7 +41,10 @@ gh-compta/
 ├── main.py                  # point d'entrée
 ├── requirements.txt
 ├── app/
-│   ├── database.py          # schéma SQLite + plan comptable initial
+│   ├── database.py          # schéma SQLite (+ migration des anciennes bases)
+│   ├── chart_data.py        # plan comptable standard US GAAP ↔ SYCEBNL
+│   ├── chart_plan.py        # sections, classement SYCEBNL, import/export Excel
+│   ├── reports.py           # rapports en double version
 │   ├── logic.py              # écritures comptables, factures, dépenses, rapports
 │   ├── main_window.py        # fenêtre principale (barre latérale + navigation)
 │   ├── ui_utils.py
