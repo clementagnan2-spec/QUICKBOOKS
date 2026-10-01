@@ -18,6 +18,7 @@ from .pages.reconciliation_page import ReconciliationPage
 from .pages.currency_page import CurrencyPage
 from .pages.journal_page import JournalPage
 from .pages.reports_page import ReportsPage
+from .pages.import_page import ImportPage
 
 NAV_ITEMS = [
     ("Tableau de bord", "dashboard"),
@@ -32,6 +33,7 @@ NAV_ITEMS = [
     ("Devises", "currency"),
     ("Journal général", "journal"),
     ("Rapports", "reports"),
+    ("Importer des données", "import"),
 ]
 
 
@@ -102,6 +104,7 @@ class MainWindow(QMainWindow):
         self._add_page("currency", CurrencyPage(self.db))
         self._add_page("journal", JournalPage(self.db))
         self._add_page("reports", ReportsPage(self.db))
+        self._add_page("import", ImportPage(self.db))
 
         self.nav_list.currentRowChanged.connect(self._on_nav_changed)
         self.nav_list.setCurrentRow(0)

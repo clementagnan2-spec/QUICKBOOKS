@@ -12,6 +12,8 @@ avec une base de données **SQLite locale**. Compilable en `.exe` Windows via Gi
 - **Rapports en double version** (Bilan, Compte de résultat, Flux de trésorerie) : version
   **US GAAP** et version **SYCEBNL**, côte à côte à l'écran et dans un même PDF (une page par version).
   Les écritures sont saisies une seule fois ; seul le regroupement des comptes change.
+- **Import Excel** (menu « Importer des données ») : écritures comptables, balance N-1 (à-nouveaux)
+  et balance N (soldes de clôture), avec contrôle d'équilibre, résumé avant validation et modèles Excel.
 - **Clients** et **Fournisseurs**
 - **Ventes / Factures** avec lignes multiples, liées ou non à un article de stock → écriture
   automatique (Débit Comptes clients / Crédit Produits, + sortie de stock et COGS si applicable)
@@ -45,6 +47,7 @@ gh-compta/
 │   ├── chart_data.py        # plan comptable standard US GAAP ↔ SYCEBNL
 │   ├── chart_plan.py        # sections, classement SYCEBNL, import/export Excel
 │   ├── reports.py           # rapports en double version
+│   ├── importers.py         # import Excel : écritures, balance N-1, balance N
 │   ├── logic.py              # écritures comptables, factures, dépenses, rapports
 │   ├── main_window.py        # fenêtre principale (barre latérale + navigation)
 │   ├── ui_utils.py
